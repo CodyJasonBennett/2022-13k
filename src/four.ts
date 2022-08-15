@@ -78,27 +78,40 @@ export class Geometry {
 
 export type Uniform = number | number[] | Float32Array
 
+export type Side = 'front' | 'back' | 'both'
+
 export interface MaterialOptions {
   uniforms?: Record<string, Uniform>
   vertex: string
   fragment: string
+  side?: Side
+  transparent?: boolean
+  depthTest?: boolean
+  depthWrite?: boolean
 }
 
 export class Material implements MaterialOptions {
   readonly uniforms: Record<string, Uniform> = {}
   readonly vertex!: string
   readonly fragment!: string
+  public side: Side = 'front'
+  public transparent = false
+  public depthTest = true
+  public depthWrite = true
 
   constructor(options: MaterialOptions) {
     Object.assign(this, options)
   }
 }
 
+export type Mode = 'TRIANGLES' | 'POINTS' | 'LINES'
+
 export class Mesh extends Object3D {
   readonly geometry: Geometry
   readonly material: Material
   readonly modelViewMatrix = mat4.create()
   readonly normalMatrix = mat3.create()
+  public mode: Mode = 'TRIANGLES'
 
   constructor(geometry: Geometry, material: Material) {
     super()
@@ -123,10 +136,6 @@ export class Renderer {
   constructor(canvas: HTMLCanvasElement = document.createElement('canvas')) {
     this.canvas = canvas
     this.gl = canvas.getContext('webgl2', { antialias: true, powerPreference: 'high-performance' })!
-    this.gl.enable(this.gl.CULL_FACE)
-    this.gl.cullFace(this.gl.BACK)
-    this.gl.enable(this.gl.DEPTH_TEST)
-    this.gl.depthFunc(this.gl.LESS)
   }
 
   setSize(width: number, height: number): void {
@@ -247,9 +256,33 @@ export class Renderer {
 
       this.compile(node, camera)
 
+      if (node.material.side === 'both') {
+        this.gl.disable(this.gl.CULL_FACE)
+        this.gl.disable(this.gl.DEPTH_TEST)
+      } else {
+        this.gl.enable(this.gl.CULL_FACE)
+        this.gl.cullFace(node.material.side === 'front' ? this.gl.BACK : this.gl.FRONT)
+      }
+
+      if (node.material.depthTest) {
+        this.gl.enable(this.gl.DEPTH_TEST)
+        this.gl.depthFunc(this.gl.LESS)
+      } else {
+        this.gl.disable(this.gl.DEPTH_TEST)
+      }
+
+      this.gl.depthMask(node.material.depthWrite)
+
+      if (node.material.transparent) {
+        this.gl.enable(this.gl.BLEND)
+        this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA)
+      } else {
+        this.gl.disable(this.gl.BLEND)
+      }
+
       const { index, position } = node.geometry.attributes
-      if (index) this.gl.drawElements(this.gl.TRIANGLES, index.data.length / index.size, this.gl.UNSIGNED_INT, 0)
-      else this.gl.drawArrays(this.gl.TRIANGLES, 0, position.data.length / position.size)
+      if (index) this.gl.drawElements(this.gl[node.mode], index.data.length / index.size, this.gl.UNSIGNED_INT, 0)
+      else this.gl.drawArrays(this.gl[node.mode], 0, position.data.length / position.size)
     })
   }
 }
