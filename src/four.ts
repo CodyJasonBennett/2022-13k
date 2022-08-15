@@ -5,10 +5,17 @@ export class Object3D {
   readonly quaternion = quat.create()
   readonly position = vec3.create()
   readonly scale = vec3.set(vec3.create(), 1, 1, 1)
+  readonly up = vec3.set(vec3.create(), 0, 1, 0)
   readonly children: Object3D[] = []
   public parent: Object3D | null = null
   public matrixAutoUpdate = true
   public visible = true
+
+  lookAt(target: vec3): void {
+    mat4.lookAt(this.matrix, this.position, target, this.up)
+    mat4.getRotation(this.quaternion, this.matrix)
+    quat.invert(this.quaternion, this.quaternion)
+  }
 
   updateMatrix(): void {
     if (this.matrixAutoUpdate)
@@ -132,6 +139,9 @@ export class Renderer {
   readonly gl: WebGL2RenderingContext
   public autoClear = true
   private _compiled = new WeakMap<Mesh, Compiled>()
+  private _a = vec3.create()
+  private _b = vec3.create()
+  private _c = vec3.create()
 
   constructor(canvas: HTMLCanvasElement = document.createElement('canvas')) {
     this.canvas = canvas
@@ -244,16 +254,40 @@ export class Renderer {
     this.gl.clear(bits)
   }
 
+  painterSort(camera?: Camera): undefined | ((a: Mesh, b: Mesh) => number) {
+    if (!camera) return
+
+    mat4.getTranslation(this._c, camera.matrix)
+
+    return (a, b) =>
+      vec3.distance(mat4.getTranslation(this._a, a.matrix), this._c) -
+      vec3.distance(mat4.getTranslation(this._b, b.matrix), this._c)
+  }
+
+  sort(scene: Object3D, camera?: Camera): Mesh[] {
+    const opaque: Mesh[] = []
+    const transparent: Mesh[] = []
+
+    scene.traverse((node) => {
+      if (!node.visible) return true
+      if (!(node instanceof Mesh)) return
+
+      if (node.material.transparent) transparent.push(node)
+      else opaque.push(node)
+    })
+
+    const sort = this.painterSort(camera)
+    return opaque.sort(sort).concat(transparent.sort(sort).reverse())
+  }
+
   render(scene: Object3D, camera?: Camera): void {
     if (this.autoClear) this.clear()
 
     camera?.updateMatrix()
     scene.updateMatrix()
 
-    scene.traverse((node) => {
-      if (!node.visible) return true
-      if (!(node instanceof Mesh)) return
-
+    const renderList = this.sort(scene, camera)
+    for (const node of renderList) {
       this.compile(node, camera)
 
       if (node.material.side === 'both') {
@@ -283,6 +317,6 @@ export class Renderer {
       const { index, position } = node.geometry.attributes
       if (index) this.gl.drawElements(this.gl[node.mode], index.data.length / index.size, this.gl.UNSIGNED_INT, 0)
       else this.gl.drawArrays(this.gl[node.mode], 0, position.data.length / position.size)
-    })
+    }
   }
 }
