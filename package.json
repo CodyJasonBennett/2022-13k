@@ -1,6 +1,5 @@
 {
   "devDependencies": {
-    "@types/node": "^18.7.4",
     "glslx": "^0.2.13",
     "html-minifier-terser": "^7.0.0",
     "roadroller": "^2.1.0",
