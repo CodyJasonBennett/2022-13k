@@ -207,7 +207,6 @@ export class Renderer {
 
       this.gl.linkProgram(program)
 
-      // @ts-expect-error Only validate in development
       if (process.env.NODE_ENV === 'development') {
         for (const shader of [vertexShader, fragmentShader]) {
           const error = this.gl.getShaderInfoLog(shader)
