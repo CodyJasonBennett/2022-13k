@@ -1,14 +1,18 @@
 import { Renderer, Object3D, Camera, Mesh } from './four'
 import { BoxGeometry } from './geometry/BoxGeometry'
 import { WireMaterial } from './materials/WireMaterial'
+import { Controls } from './Controls'
 
 const renderer = new Renderer()
 document.body.appendChild(renderer.canvas)
 
 const scene = new Object3D()
 
-const camera = new Camera(45, 1, 0.1, 20000)
+const camera = new Camera()
 camera.position[2] = 5
+
+const controls = new Controls(camera)
+controls.connect(renderer.canvas)
 
 const pink = new Mesh(new BoxGeometry(), new WireMaterial([1.0, 0.3, 0.9]))
 pink.position[0] = -1
