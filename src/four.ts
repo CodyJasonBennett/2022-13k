@@ -70,6 +70,30 @@ export class Camera extends Object3D {
   }
 }
 
+export type ImageRepresentation = ImageBitmap | HTMLCanvasElement
+
+export class Texture {
+  public image?: ImageRepresentation
+
+  constructor(image?: ImageRepresentation) {
+    this.image = image
+  }
+}
+
+export class RenderTarget {
+  readonly width: number
+  readonly height: number
+  readonly count: number
+  readonly textures: Texture[]
+
+  constructor(width: number, height: number, count = 1) {
+    this.width = width
+    this.height = height
+    this.count = count
+    this.textures = Array.from({ length: count }, () => new Texture())
+  }
+}
+
 export interface Attribute {
   data: Float32Array | Uint32Array
   size: number
@@ -83,7 +107,7 @@ export class Geometry {
   }
 }
 
-export type Uniform = number | number[] | Float32Array
+export type Uniform = number | number[] | Float32Array | Texture
 
 export type Side = 'front' | 'back' | 'both'
 
@@ -138,7 +162,11 @@ export class Renderer {
   readonly canvas: HTMLCanvasElement
   readonly gl: WebGL2RenderingContext
   public autoClear = true
+  private _renderTarget: RenderTarget | null = null
   private _compiled = new WeakMap<Mesh, Compiled>()
+  private _textures = new WeakMap<Texture, WebGLTexture>()
+  private _FBOs = new WeakMap<RenderTarget, WebGLFramebuffer>()
+  private _textureIndex = 0
   private _a = vec3.create()
   private _b = vec3.create()
   private _c = vec3.create()
@@ -151,12 +179,26 @@ export class Renderer {
   setSize(width: number, height: number): void {
     this.canvas.width = width
     this.canvas.height = height
-    this.gl.viewport(0, 0, width, height)
   }
 
   setUniform(program: WebGLProgram, name: string, value: Uniform): void {
     const location = this.gl.getUniformLocation(program, name)
     if (location === -1) return
+
+    if (value instanceof Texture) {
+      let texture = this._textures.get(value)!
+      if (!texture) {
+        texture = this.gl.createTexture()!
+        this.gl.bindTexture(this.gl.TEXTURE_2D, texture)
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, value.image!)
+        this._textures.set(value, texture)
+      }
+
+      const index = this._textureIndex++
+      this.gl.activeTexture(this.gl.TEXTURE0 + index)
+      this.gl.bindTexture(this.gl.TEXTURE_2D, texture)
+      return this.gl.uniform1i(location, index)
+    }
 
     if (typeof value === 'number') return this.gl.uniform1f(location, value)
     switch (value.length) {
@@ -245,9 +287,14 @@ export class Renderer {
     this.gl.bindVertexArray(compiled.VAO)
     this.gl.useProgram(compiled.program)
 
+    this._textureIndex = 0
     for (const key in mesh.material.uniforms) this.setUniform(compiled.program, key, mesh.material.uniforms[key])
 
     return compiled
+  }
+
+  setRenderTarget(target: RenderTarget | null) {
+    this._renderTarget = target
   }
 
   clear(bits = this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT) {
@@ -281,6 +328,46 @@ export class Renderer {
   }
 
   render(scene: Object3D, camera?: Camera): void {
+    if (this._renderTarget) {
+      let FBO = this._FBOs.get(this._renderTarget)
+      if (!FBO) {
+        FBO = this.gl.createFramebuffer()!
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, FBO)
+
+        const attachments: number[] = []
+        for (let i = 0; i < this._renderTarget.count; i++) {
+          const attachment = this.gl.COLOR_ATTACHMENT0 + i
+          attachments.push(attachment)
+
+          const texture = this.gl.createTexture()!
+          this.gl.bindTexture(this.gl.TEXTURE_2D, texture)
+          this.gl.texImage2D(
+            this.gl.TEXTURE_2D,
+            0,
+            this.gl.RGBA,
+            this._renderTarget.width,
+            this._renderTarget.height,
+            0,
+            this.gl.RGBA,
+            this.gl.UNSIGNED_BYTE,
+            null,
+          )
+          this._textures.set(this._renderTarget.textures[i], texture)
+
+          this.gl.framebufferTexture2D(this.gl.DRAW_FRAMEBUFFER, attachment, this.gl.TEXTURE_2D, texture, 0)
+        }
+        this.gl.drawBuffers(attachments)
+
+        this._FBOs.set(this._renderTarget, FBO)
+      }
+
+      this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, FBO)
+      this.gl.viewport(0, 0, this._renderTarget.width, this._renderTarget.height)
+    } else {
+      this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null)
+      this.gl.viewport(0, 0, this.canvas.width, this.canvas.height)
+    }
+
     if (this.autoClear) this.clear()
 
     camera?.updateMatrix()
