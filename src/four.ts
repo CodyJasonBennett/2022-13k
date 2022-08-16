@@ -70,12 +70,10 @@ export class Camera extends Object3D {
   }
 }
 
-export type ImageRepresentation = ImageBitmap | HTMLCanvasElement
-
 export class Texture {
-  public image?: ImageRepresentation
+  public image?: TexImageSource
 
-  constructor(image?: ImageRepresentation) {
+  constructor(image?: TexImageSource) {
     this.image = image
   }
 }
@@ -191,6 +189,7 @@ export class Renderer {
         texture = this.gl.createTexture()!
         this.gl.bindTexture(this.gl.TEXTURE_2D, texture)
         this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, value.image!)
+        this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1)
         this._textures.set(value, texture)
       }
 
@@ -301,30 +300,26 @@ export class Renderer {
     this.gl.clear(bits)
   }
 
-  painterSort(camera?: Camera): undefined | ((a: Mesh, b: Mesh) => number) {
-    if (!camera) return
-
-    mat4.getTranslation(this._c, camera.matrix)
-
-    return (a, b) =>
-      vec3.distance(mat4.getTranslation(this._a, a.matrix), this._c) -
-      vec3.distance(mat4.getTranslation(this._b, b.matrix), this._c)
-  }
-
   sort(scene: Object3D, camera?: Camera): Mesh[] {
-    const opaque: Mesh[] = []
-    const transparent: Mesh[] = []
+    const renderList: Mesh[] = []
 
     scene.traverse((node) => {
       if (!node.visible) return true
       if (!(node instanceof Mesh)) return
 
-      if (node.material.transparent) transparent.push(node)
-      else opaque.push(node)
+      renderList.push(node)
     })
 
-    const sort = this.painterSort(camera)
-    return opaque.sort(sort).concat(transparent.sort(sort).reverse())
+    if (camera) mat4.getTranslation(this._c, camera.matrix)
+
+    return renderList.sort(
+      (a, b) =>
+        (b.material.depthTest as unknown as number) - (a.material.depthTest as unknown as number) ||
+        (!!camera &&
+          vec3.distance(mat4.getTranslation(this._b, b.matrix), this._c) -
+            vec3.distance(mat4.getTranslation(this._a, a.matrix), this._c)) ||
+        (a.material.transparent as unknown as number) - (b.material.transparent as unknown as number),
+    )
   }
 
   render(scene: Object3D, camera?: Camera): void {
