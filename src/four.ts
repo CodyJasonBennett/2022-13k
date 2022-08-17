@@ -72,6 +72,7 @@ export class Camera extends Object3D {
 
 export class Texture {
   public image?: TexImageSource
+  public needsUpdate = true
 
   constructor(image?: TexImageSource) {
     this.image = image
@@ -79,16 +80,23 @@ export class Texture {
 }
 
 export class RenderTarget {
-  readonly width: number
-  readonly height: number
+  public width: number
+  public height: number
   readonly count: number
   readonly textures: Texture[]
+  public needsUpdate = true
 
   constructor(width: number, height: number, count = 1) {
     this.width = width
     this.height = height
     this.count = count
     this.textures = Array.from({ length: count }, () => new Texture())
+  }
+
+  setSize(width: number, height: number): void {
+    this.width = width
+    this.height = height
+    this.needsUpdate = true
   }
 }
 
@@ -188,14 +196,18 @@ export class Renderer {
       if (!texture) {
         texture = this.gl.createTexture()!
         this.gl.bindTexture(this.gl.TEXTURE_2D, texture)
-        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, value.image!)
         this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1)
+        this.gl.generateMipmap(this.gl.TEXTURE_2D)
         this._textures.set(value, texture)
       }
 
       const index = this._textureIndex++
       this.gl.activeTexture(this.gl.TEXTURE0 + index)
       this.gl.bindTexture(this.gl.TEXTURE_2D, texture)
+      if (value.needsUpdate) {
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, value.image!)
+        value.needsUpdate = false
+      }
       return this.gl.uniform1i(location, index)
     }
 
@@ -305,9 +317,7 @@ export class Renderer {
 
     scene.traverse((node) => {
       if (!node.visible) return true
-      if (!(node instanceof Mesh)) return
-
-      renderList.push(node)
+      if (node instanceof Mesh) renderList.push(node)
     })
 
     if (camera) mat4.getTranslation(this._c, camera.matrix)
@@ -325,17 +335,26 @@ export class Renderer {
   render(scene: Object3D, camera?: Camera): void {
     if (this._renderTarget) {
       let FBO = this._FBOs.get(this._renderTarget)
-      if (!FBO) {
+      if (!FBO || this._renderTarget.needsUpdate) {
+        if (FBO) this.gl.deleteFramebuffer(FBO)
         FBO = this.gl.createFramebuffer()!
         this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, FBO)
 
         const attachments: number[] = []
-        for (let i = 0; i < this._renderTarget.count; i++) {
-          const attachment = this.gl.COLOR_ATTACHMENT0 + i
+
+        let attachment = this.gl.COLOR_ATTACHMENT0
+        for (const texture of this._renderTarget.textures) {
           attachments.push(attachment)
 
-          const texture = this.gl.createTexture()!
-          this.gl.bindTexture(this.gl.TEXTURE_2D, texture)
+          let target = this._textures.get(texture)
+          if (!target) {
+            target = this.gl.createTexture()!
+            this.gl.bindTexture(this.gl.TEXTURE_2D, target)
+            this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST)
+            this._textures.set(texture, target)
+            texture.needsUpdate = false
+          }
+          this.gl.bindTexture(this.gl.TEXTURE_2D, target)
           this.gl.texImage2D(
             this.gl.TEXTURE_2D,
             0,
@@ -347,11 +366,12 @@ export class Renderer {
             this.gl.UNSIGNED_BYTE,
             null,
           )
-          this._textures.set(this._renderTarget.textures[i], texture)
 
-          this.gl.framebufferTexture2D(this.gl.DRAW_FRAMEBUFFER, attachment, this.gl.TEXTURE_2D, texture, 0)
+          this.gl.framebufferTexture2D(this.gl.DRAW_FRAMEBUFFER, attachment, this.gl.TEXTURE_2D, target, 0)
+          attachment++
         }
         this.gl.drawBuffers(attachments)
+        this._renderTarget.needsUpdate = false
 
         this._FBOs.set(this._renderTarget, FBO)
       }
