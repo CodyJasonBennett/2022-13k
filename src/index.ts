@@ -12,8 +12,11 @@ const scene = new Object3D()
 const camera = new Camera()
 camera.position[2] = 5
 
-const controls = new Controls(camera)
-controls.connect(renderer.canvas)
+// @ts-expect-error
+if (process.env.NODE_ENV === 'development') {
+  const controls = new Controls(camera)
+  controls.connect(renderer.canvas)
+}
 
 const pink = new Mesh(new BoxGeometry(), new WireMaterial([1.0, 0.3, 0.9]))
 pink.position[0] = -1
