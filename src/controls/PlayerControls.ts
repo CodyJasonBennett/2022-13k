@@ -30,18 +30,18 @@ export class PlayerControls {
   onKeyPress(event: KeyboardEvent): void {
     const value = event.type === 'keydown' ? 1 : 0
     switch (event.code) {
-      case 'ArrowUp':
-        return void (this._movement[AXIS.PITCH_DOWN] = value)
       case 'ArrowDown':
         return void (this._movement[AXIS.PITCH_UP] = value)
-      case 'ArrowLeft':
-        return void (this._movement[AXIS.ROLL_LEFT] = value)
+      case 'ArrowUp':
+        return void (this._movement[AXIS.PITCH_DOWN] = value)
       case 'ArrowRight':
         return void (this._movement[AXIS.ROLL_RIGHT] = value)
+      case 'ArrowLeft':
+        return void (this._movement[AXIS.ROLL_LEFT] = value)
       case 'KeyQ':
-        return void (this._movement[AXIS.YAW_LEFT] = value)
-      case 'KeyE':
         return void (this._movement[AXIS.YAW_RIGHT] = value)
+      case 'KeyE':
+        return void (this._movement[AXIS.YAW_LEFT] = value)
     }
   }
 
