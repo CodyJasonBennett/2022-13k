@@ -14,7 +14,6 @@ export class Object3D {
   lookAt(target: vec3): void {
     mat4.lookAt(this.matrix, this.position, target, this.up)
     mat4.getRotation(this.quaternion, this.matrix)
-    quat.invert(this.quaternion, this.quaternion)
   }
 
   updateMatrix(): void {

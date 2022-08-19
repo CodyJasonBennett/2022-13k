@@ -1,6 +1,6 @@
 // Adapted from my threejs version: https://gist.github.com/CodyJasonBennett/4c2b6f758dec7be618eafd5b3d96769a
-import { vec3 } from 'gl-matrix'
-import type { Camera } from './four'
+import { vec3, quat } from 'gl-matrix'
+import type { Camera } from '../four'
 
 // https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/buttons
 enum BUTTONS {
@@ -17,7 +17,7 @@ const _v = vec3.create()
 /**
  * Orbital controls that revolve a camera around a point.
  */
-export class Controls {
+export class OrbitControls {
   /** The center point to orbit around. Default is `0, 0, 0` */
   readonly center = vec3.create()
   /** The speed factor for panning and orbiting. Default is `1` */
@@ -50,7 +50,6 @@ export class Controls {
 
   constructor(camera: Camera) {
     this._camera = camera
-    this._camera.lookAt(this.center)
 
     // Ensure methods don't descope and re-inherit `this`
     const properties = Object.getOwnPropertyNames(Object.getPrototypeOf(this))
@@ -92,6 +91,7 @@ export class Controls {
 
     vec3.add(this._camera.position, this._camera.position, this.center)
     this._camera.lookAt(this.center)
+    quat.invert(this._camera.quaternion, this._camera.quaternion)
   }
 
   /**
