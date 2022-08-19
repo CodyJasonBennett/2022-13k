@@ -1,10 +1,37 @@
 import { defineConfig } from 'vite'
 import { Packer, InputType, InputAction } from 'roadroller'
 
+const mangleMap: Record<string, string> = {
+  projectionMatrix: 'uPM',
+  modelViewMatrix: 'uMVM',
+}
+
 export default defineConfig({
   build: {
     target: 'esnext',
     polyfillModulePreload: false,
+    minify: 'terser',
+    terserOptions: {
+      module: true,
+      toplevel: true,
+      compress: {
+        ecma: 2020,
+        module: true,
+        passes: 3,
+        unsafe_arrows: true,
+        unsafe_comps: true,
+        unsafe_math: true,
+        unsafe_methods: true,
+        unsafe_proto: true,
+      },
+      mangle: {
+        module: true,
+        toplevel: true,
+        properties: {
+          reserved: Object.keys(mangleMap),
+        },
+      },
+    },
   },
   plugins: [
     {
@@ -20,10 +47,13 @@ export default defineConfig({
             .replace(/\n|\s+/g, '')
             .replace(/;\w*\}/g, '}')
 
+          let js = ctx.chunk.code.trim()
+          for (const key in mangleMap) js = js.replaceAll(key, mangleMap[key])
+
           const packer = new Packer(
             [
               {
-                data: `document.write('<body>${css}</body>');${ctx.chunk.code.trim()}`,
+                data: `document.write('<body>${css}</body>');${js}`,
                 type: 'js' as InputType,
                 action: 'eval' as InputAction,
               },
