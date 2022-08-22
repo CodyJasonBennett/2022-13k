@@ -3,6 +3,7 @@ import type { Object3D, Camera } from '../four'
 
 const MOVEMENT_SPEED = 20
 const ROLL_SPEED = 0.4
+const OFFSET = 5
 
 enum AXIS {
   PITCH_UP = 0,
@@ -46,11 +47,18 @@ export class PlayerControls {
   }
 
   update(delta: number): void {
+    const distance = vec3.distance(this._player.position, this._camera.position) - OFFSET
+
     // Move player forward
-    vec3.copy(this._v, this._forward)
-    vec3.transformQuat(this._v, this._v, this._player.quaternion)
+    vec3.transformQuat(this._v, this._forward, this._player.quaternion)
     vec3.scale(this._v, this._v, -delta * MOVEMENT_SPEED)
     vec3.add(this._player.position, this._player.position, this._v)
+
+    // Animate follow camera
+    vec3.sub(this._v, this._player.position, this._camera.position)
+    vec3.normalize(this._v, this._v)
+    vec3.scale(this._v, this._v, distance)
+    vec3.add(this._camera.position, this._camera.position, this._v)
 
     // Rotate player
     quat.set(
@@ -62,18 +70,7 @@ export class PlayerControls {
     )
     quat.normalize(this._q, this._q)
     quat.multiply(this._player.quaternion, this._player.quaternion, this._q)
-
-    // Animate follow camera
-    vec3.copy(this._v, this._player.position)
-    vec3.lerp(this._v, this._v, this._player.position, 0.4)
-
-    const distance = vec3.distance(this._v, this._camera.position) - 5
-    vec3.sub(this._v, this._v, this._camera.position)
-    vec3.normalize(this._v, this._v)
-    vec3.scaleAndAdd(this._camera.position, this._camera.position, this._v, distance)
-
-    this._camera.lookAt(this._player.position)
-    quat.copy(this._camera.quaternion, this._player.quaternion)
+    quat.multiply(this._camera.quaternion, this._camera.quaternion, this._q)
   }
 
   connect(): void {
