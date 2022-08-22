@@ -6,12 +6,13 @@ export class WireMaterial extends Material {
       vertex: /* glsl */ `#version 300 es
         uniform mat4 projectionMatrix;
         uniform mat4 modelViewMatrix;
-        in vec3 barycentric;
         in vec3 position;
         out vec3 vBarycentric;
 
+        const vec3 barycentric[3] = vec3[3](vec3(0, 1, 0), vec3(0, 0, 1), vec3(1, 0, 0));
+
         void main() {
-          vBarycentric = barycentric;
+          vBarycentric = barycentric[(gl_VertexID + 1) % 3];
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
       `,
@@ -22,9 +23,11 @@ export class WireMaterial extends Material {
         out vec4 pc_fragColor;
 
         void main() {
-          float line = min(min(vBarycentric.x, vBarycentric.y), vBarycentric.z);
+          vec3 smooth_dist = smoothstep(vec3(0.0), fwidth(vBarycentric) * 5.5, vBarycentric);
+          float line = min(min(smooth_dist.x, smooth_dist.y), smooth_dist.z);
+
           float edge = 1.0 - smoothstep(${thickness} - fwidth(line), ${thickness} + fwidth(line), line);
-          pc_fragColor = vec4(${color}, edge + 0.08);
+          pc_fragColor = vec4(${color}, edge);
         }
       `,
       side: 'both',

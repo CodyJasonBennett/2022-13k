@@ -1,7 +1,8 @@
-import { Renderer, Camera, Object3D } from './four'
+import { Renderer, Camera, Object3D, Mesh } from './four'
 import { Stars } from './objects/Stars'
-import { Cube } from './objects/Cube'
 import { PlayerControls } from './controls/PlayerControls'
+import { ShipGeometry } from './geometry/ShipGeometry'
+import { WireMaterial } from './materials/WireMaterial'
 
 const renderer = new Renderer()
 document.body.appendChild(renderer.canvas)
@@ -14,7 +15,7 @@ const scene = new Object3D()
 const stars = new Stars()
 scene.add(stars)
 
-const player = new Cube()
+const player = new Mesh(new ShipGeometry(), new WireMaterial())
 scene.add(player)
 
 const controls = new PlayerControls(player, camera)
