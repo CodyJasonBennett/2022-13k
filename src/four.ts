@@ -103,13 +103,18 @@ export class RenderTarget {
 export interface Attribute {
   data: Float32Array | Uint32Array
   size: number
+  divisor?: number
+  needsUpdate?: boolean
 }
 
 export class Geometry {
-  readonly attributes: Record<string, Attribute>
+  readonly attributes: Record<string, Attribute> = {}
 
   constructor(attributes: Record<string, Attribute>) {
-    this.attributes = attributes
+    for (const key in attributes) {
+      this.attributes[key] = attributes[key]
+      this.attributes[key].needsUpdate = true
+    }
   }
 }
 
@@ -149,6 +154,7 @@ export class Mesh extends Object3D {
   readonly modelViewMatrix = mat4.create()
   readonly normalMatrix = mat3.create()
   public mode: Mode = 'TRIANGLES'
+  public instances = 1
 
   constructor(geometry: Geometry, material: Material) {
     super()
@@ -170,6 +176,7 @@ export class Renderer {
   public autoClear = true
   private _renderTarget: RenderTarget | null = null
   private _compiled = new WeakMap<Mesh, Compiled>()
+  private _buffers = new WeakMap<Attribute, WebGLBuffer>()
   private _textures = new WeakMap<Texture, WebGLTexture>()
   private _FBOs = new WeakMap<RenderTarget, WebGLFramebuffer>()
   private _textureIndex = 0
@@ -274,29 +281,50 @@ export class Renderer {
       this.gl.deleteShader(vertexShader)
       this.gl.deleteShader(fragmentShader)
 
-      this.gl.bindVertexArray(VAO)
-
-      for (const key in mesh.geometry.attributes) {
-        const { data, size } = mesh.geometry.attributes[key]
-
-        const buffer = this.gl.createBuffer()!
-        const type = key === 'index' ? this.gl.ELEMENT_ARRAY_BUFFER : this.gl.ARRAY_BUFFER
-        this.gl.bindBuffer(type, buffer)
-        this.gl.bufferData(type, data, this.gl.STATIC_DRAW)
-
-        const location = this.gl.getAttribLocation(program, key)
-        if (location !== -1) {
-          this.gl.enableVertexAttribArray(location)
-          this.gl.vertexAttribPointer(location, size, this.gl.FLOAT, false, 0, 0)
-        }
-      }
-
       compiled = { program, VAO }
       this._compiled.set(mesh, compiled)
     }
 
     this.gl.bindVertexArray(compiled.VAO)
     this.gl.useProgram(compiled.program)
+
+    for (const key in mesh.geometry.attributes) {
+      const attribute = mesh.geometry.attributes[key]
+      const type = key === 'index' ? this.gl.ELEMENT_ARRAY_BUFFER : this.gl.ARRAY_BUFFER
+
+      let buffer = this._buffers.get(attribute)
+      if (!buffer) {
+        buffer = this.gl.createBuffer()!
+        this._buffers.set(attribute, buffer)
+        this.gl.bindBuffer(type, buffer)
+        this.gl.bufferData(type, attribute.data, this.gl.STATIC_DRAW)
+
+        const location = this.gl.getAttribLocation(compiled.program, key)
+        if (location !== -1) {
+          const slots = Math.min(4, Math.max(1, Math.floor(attribute.size / 3)))
+
+          for (let i = 0; i < slots; i++) {
+            this.gl.enableVertexAttribArray(location + i)
+            this.gl.vertexAttribPointer(
+              location + i,
+              attribute.size / slots,
+              this.gl.FLOAT,
+              false,
+              attribute.data.BYTES_PER_ELEMENT * attribute.size,
+              attribute.size * i,
+            )
+            if (attribute.divisor) this.gl.vertexAttribDivisor(location + i, attribute.divisor)
+          }
+        }
+
+        attribute.needsUpdate = false
+      }
+
+      if (attribute.needsUpdate) {
+        this.gl.bufferSubData(type, attribute.data.byteOffset, attribute.data)
+        attribute.needsUpdate = false
+      }
+    }
 
     this._textureIndex = 0
     for (const key in mesh.material.uniforms) this.setUniform(compiled.program, key, mesh.material.uniforms[key])
@@ -416,9 +444,11 @@ export class Renderer {
         this.gl.disable(this.gl.BLEND)
       }
 
+      const mode = this.gl[node.mode]
       const { index, position } = node.geometry.attributes
-      if (index) this.gl.drawElements(this.gl[node.mode], index.data.length / index.size, this.gl.UNSIGNED_INT, 0)
-      else this.gl.drawArrays(this.gl[node.mode], 0, position.data.length / position.size)
+      if (index)
+        this.gl.drawElementsInstanced(mode, index.data.length / index.size, this.gl.UNSIGNED_INT, 0, node.instances)
+      else this.gl.drawArraysInstanced(mode, 0, position.data.length / position.size, node.instances)
     }
   }
 }
