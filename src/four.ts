@@ -321,7 +321,7 @@ export class Renderer {
       }
 
       if (attribute.needsUpdate) {
-        this.gl.bufferSubData(type, attribute.data.byteOffset, attribute.data)
+        this.gl.bufferData(type, attribute.data, this.gl.DYNAMIC_DRAW)
         attribute.needsUpdate = false
       }
     }
