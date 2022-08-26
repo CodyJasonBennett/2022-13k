@@ -6,10 +6,11 @@ export class BasicMaterial extends Material {
       vertex: /* glsl */ `#version 300 es
         uniform mat4 projectionMatrix;
         uniform mat4 modelViewMatrix;
+        in mat4 instanceMatrix;
         in vec3 position;
 
         void main() {
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
         }
       `,
       fragment: /* glsl */ `#version 300 es

@@ -7,13 +7,14 @@ export class LambertMaterial extends Material {
         uniform mat4 projectionMatrix;
         uniform mat4 modelViewMatrix;
         uniform mat3 normalMatrix;
-        in vec3 position;
         in vec3 normal;
+        in mat4 instanceMatrix;
+        in vec3 position;
         out vec3 vNormal;
 
         void main() {
           vNormal = normalMatrix * normal;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
         }
       `,
       fragment: /* glsl */ `#version 300 es

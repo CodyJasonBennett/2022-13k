@@ -16,20 +16,7 @@ const scene = new Object3D()
 const stars = new Stars()
 scene.add(stars)
 
-const dummy = new Object3D()
-const matrices: number[] = []
-
-dummy.position[0] = -1.5
-dummy.updateMatrix()
-matrices.push(...Array.from(dummy.matrix))
-
-dummy.position[0] = 1.5
-dummy.updateMatrix()
-matrices.push(...Array.from(dummy.matrix))
-
 const player = new Mesh(new ShipGeometry(), new OutlineMaterial())
-player.instances = matrices.length / 16
-player.geometry.attributes.instanceMatrix = { size: 16, divisor: 1, data: new Float32Array(matrices) }
 scene.add(player)
 
 // @ts-expect-error

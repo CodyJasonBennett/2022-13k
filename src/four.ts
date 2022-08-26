@@ -160,6 +160,7 @@ export class Mesh extends Object3D {
     super()
     this.geometry = geometry
     this.material = material
+    this.geometry.attributes.instanceMatrix ??= { divisor: 1, size: 16, data: new Float32Array(mat4.create()) }
   }
 }
 
