@@ -47,14 +47,13 @@ export class PlayerControls {
   }
 
   update(delta: number): void {
-    const distance = vec3.distance(this._player.position, this._camera.position) - OFFSET
-
     // Move player forward
     vec3.transformQuat(this._v, this._forward, this._player.quaternion)
     vec3.scale(this._v, this._v, -delta * MOVEMENT_SPEED)
     vec3.add(this._player.position, this._player.position, this._v)
 
     // Animate follow camera
+    const distance = vec3.distance(this._player.position, this._camera.position) - OFFSET
     vec3.sub(this._v, this._player.position, this._camera.position)
     vec3.normalize(this._v, this._v)
     vec3.scale(this._v, this._v, distance)
