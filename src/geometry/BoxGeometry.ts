@@ -14,6 +14,14 @@ export class BoxGeometry extends Geometry {
           0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5, 0.5, -0.5,
         ]),
       },
+      barycentric: {
+        size: 3,
+        data: new Float32Array(
+          Array.from({ length: 36 }).flatMap((_, i) =>
+            i % 2 ? [0, 1, 0, 0, 0, 1, 1, 0, 1] : [0, 0, 1, 0, 1, 0, 1, 0, 1],
+          ),
+        ),
+      },
     })
   }
 }

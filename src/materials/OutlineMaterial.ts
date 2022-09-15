@@ -6,14 +6,13 @@ export class OutlineMaterial extends Material {
       vertex: /* glsl */ `#version 300 es
         uniform mat4 projectionMatrix;
         uniform mat4 modelViewMatrix;
+        in vec3 barycentric;
         in mat4 instanceMatrix;
         in vec3 position;
         out vec3 vBarycentric;
 
-        const vec3 barycentric[3] = vec3[3](vec3(0, 1, 0), vec3(0, 0, 1), vec3(1, 0, 0));
-
         void main() {
-          vBarycentric = barycentric[(gl_VertexID + 1) % 3];
+          vBarycentric = barycentric;
           gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
         }
       `,

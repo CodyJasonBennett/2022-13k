@@ -1,9 +1,10 @@
+import { vec3 } from 'gl-matrix'
 import { Renderer, Camera, Object3D, Mesh } from './four'
 import { Stars } from './objects/Stars'
 import { ShipGeometry } from './geometry/ShipGeometry'
+import { BoxGeometry } from './geometry/BoxGeometry'
 import { OutlineMaterial } from './materials/OutlineMaterial'
 import { OrbitControls } from './controls/OrbitControls'
-import { PlayerControls } from './controls/PlayerControls'
 
 const renderer = new Renderer()
 document.body.appendChild(renderer.canvas)
@@ -16,17 +17,21 @@ const scene = new Object3D()
 const stars = new Stars()
 scene.add(stars)
 
+const ground = new Mesh(new BoxGeometry(), new OutlineMaterial())
+vec3.set(ground.scale, 15, Number.EPSILON, 15)
+vec3.set(ground.position, 0, -1, 0)
+scene.add(ground)
+
+const tower = new Mesh(new BoxGeometry(), new OutlineMaterial())
+vec3.set(tower.scale, 2, 10, 2)
+vec3.set(tower.position, -10, 4, -10)
+scene.add(tower)
+
 const player = new Mesh(new ShipGeometry(), new OutlineMaterial())
 scene.add(player)
 
-// @ts-expect-error
-if (process.env.NODE_ENV === 'development' && window.location.hash === '#debug') {
-  const controls = new OrbitControls(camera)
-  controls.connect(renderer.canvas)
-} else {
-  const controls = new PlayerControls(player, camera)
-  controls.connect()
-}
+const controls = new OrbitControls(camera)
+controls.connect(renderer.canvas)
 
 function handleResize(): void {
   renderer.setSize(window.innerWidth, window.innerHeight)

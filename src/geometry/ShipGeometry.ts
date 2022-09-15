@@ -126,6 +126,10 @@ export class ShipGeometry extends Geometry {
           -0.33, -0.13, 0.27, -0.33, 0.1, 0.27, -0.28, 0.15, 0.08,
         ]),
       },
+      barycentric: {
+        size: 3,
+        data: new Float32Array(Array.from({ length: 678 }).flatMap(() => [0, 1, 0, 0, 0, 1, 1, 0, 0])),
+      },
     })
   }
 }
